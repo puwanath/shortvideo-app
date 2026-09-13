@@ -1,0 +1,12 @@
+# ผลลัพธ์ของ run — ไม่ควรเข้า image (เป็น bind mount ตอนรัน)
+var/
+# ของที่ไม่เกี่ยวกับ runtime
+.git/
+.env
+*.md
+**/__pycache__/
+*.pyc
+*.pyo
+# ไฟล์ติดมาจาก Windows/WSL
+*:Zone.Identifier
+**/*:Zone.Identifier

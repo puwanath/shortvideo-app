@@ -1,0 +1,40 @@
+# --- ความลับ — ห้ามขึ้น git เด็ดขาด ---
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+
+# --- ผลลัพธ์ของ run (วิดีโอ/ภาพ/คลิป หลาย GB) และของชั่วคราว ---
+var/
+tmp/
+*.mp4
+*.mp3
+*.wav
+*.part
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# --- IDE / OS ---
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*:Zone.Identifier
+
+# --- docker / DB dump ---
+*.sql.gz
+*.dump
+
+# --- ของ Claude Code (เฉพาะเครื่องนี้) ---
+CLAUDE.md
+.claude/

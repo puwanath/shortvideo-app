@@ -1,0 +1,98 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-sv}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sv}
+      POSTGRES_DB: ${POSTGRES_DB:-shortvideo}
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-sv} -d ${POSTGRES_DB:-shortvideo}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes: [redisdata:/data]
+    # worker ทั้งตัวขึ้นกับ redis ถ้าไม่เช็ก arq จะตายตอนบูตแล้ว restart วนอยู่
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      args:
+        APP_UID: ${APP_UID:-1000}
+        APP_GID: ${APP_GID:-1000}
+    image: shortvideo:latest
+    restart: unless-stopped
+    env_file: [.env]
+    ports: ["${API_PORT:-8000}:8000"]
+    volumes:
+      - ./var/runs:/data/runs
+      - ./assets:/app/assets:ro
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+    extra_hosts:
+      # image service รันบน host ไม่ใช่ใน compose เพราะ docker ที่เครื่องนี้
+      # ไม่มี nvidia-container-toolkit เข้าถึง GPU จากใน container ไม่ได้
+      # host-gateway ทนกว่าการ hardcode IP ของ bridge ซึ่งเปลี่ยนเมื่อสร้าง network ใหม่
+      - "host.docker.internal:host-gateway"
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=4).status==200 else 1)"]
+      interval: 15s
+      timeout: 5s
+      start_period: 40s
+      retries: 5
+
+  # แยก worker ออกจาก api เพื่อให้ restart api ไม่ทำให้ run ค้าง
+  # และเพื่อจำกัด concurrency ของ render แยกจากงาน I/O
+  worker:
+    build:
+      context: .
+      args:
+        APP_UID: ${APP_UID:-1000}
+        APP_GID: ${APP_GID:-1000}
+    image: shortvideo:latest
+    restart: unless-stopped
+    env_file: [.env]
+    volumes:
+      - ./var/runs:/data/runs
+      - ./assets:/app/assets:ro
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+      # ตารางถูกสร้างใน lifespan ของ api (create_all) ไม่ใช่ใน worker
+      # ถ้า worker ขึ้นก่อนแล้วมีงานเข้า จะ query ตารางที่ยังไม่มี
+      api: {condition: service_healthy}
+    extra_hosts:
+      # image service รันบน host ไม่ใช่ใน compose เพราะ docker ที่เครื่องนี้
+      # ไม่มี nvidia-container-toolkit เข้าถึง GPU จากใน container ไม่ได้
+      # host-gateway ทนกว่าการ hardcode IP ของ bridge ซึ่งเปลี่ยนเมื่อสร้าง network ใหม่
+      - "host.docker.internal:host-gateway"
+    command: arq app.worker.WorkerSettings
+
+  # ยังไม่ได้ใช้ — โค้ดเขียนไฟล์ลง filesystem ตรง ๆ (ดู "ยังไม่ได้ทำ" ใน README)
+  # เปิดด้วย: docker compose --profile storage up -d
+  minio:
+    profiles: ["storage"]
+    image: minio/minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:?ต้องตั้ง S3_SECRET_KEY ใน .env ก่อนเปิด profile storage}
+    ports: ["9000:9000", "9001:9001"]
+    volumes: [miniodata:/data]
+
+volumes: {pgdata: {}, redisdata: {}, miniodata: {}}
