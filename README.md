@@ -1,8 +1,6 @@
-
-
-
-
 # shortvideo — ระบบผลิตวิดีโอสั้นภาษาไทยแบบ storyboard-first
+
+![หน้าจอ Shortvideo — run การ์ตูนสั้นที่ approved แล้ว](https://raw.githubusercontent.com/puwanath/shortvideo-app/main/screenshot-shortvideo.png)
 
 โจทย์หนึ่งบรรทัด → LLM คิดมุม/พล็อต → เขียนบท + ตัวละคร + บทพูด + ความยาวต่อ shot
 → ภาพอ้างอิงตัวละคร (portrait + design sheet) → storyboard → animatic → **คนอนุมัติ**
